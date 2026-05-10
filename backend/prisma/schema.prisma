@@ -1,0 +1,205 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Client {
+  id           String    @id @default(cuid())
+  name         String
+  industry     String?
+  contactName  String?
+  contactEmail String?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  projects     Project[]
+  initiatives  Initiative[]
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  budget      Float
+  startDate   DateTime
+  endDate     DateTime
+  status      String        @default("ACTIVE")
+  manager     String
+  clientId    String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  client       Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  deliverables Deliverable[]
+  paymentPlans PaymentPlan[]
+  resources    Resource[]
+  documents    Document[]
+  activityLogs ActivityLog[]
+  supportItems SupportItem[]
+  risks        RiskIssue[]
+  mandays      Mandays?
+}
+
+model Deliverable {
+  id            String   @id @default(cuid())
+  projectId     String
+  name          String
+  amount        Float
+  attachmentUrl String?
+  description   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  paymentPlans PaymentPlan[]
+}
+
+model PaymentPlan {
+  id            String   @id @default(cuid())
+  projectId     String
+  deliverableId String?
+  invoicingDate DateTime
+  status        String   @default("PENDING")
+  amount        Float
+  fiscalYear    String
+  attachmentUrl String?
+  notes         String?
+  invoiceNumber String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  deliverable Deliverable? @relation(fields: [deliverableId], references: [id], onDelete: SetNull)
+}
+
+model Resource {
+  id             String    @id @default(cuid())
+  projectId      String
+  name           String
+  role           String?
+  utilizationPct Float     @default(0)
+  weeklyHours    Float     @default(0)
+  costPerHour    Float     @default(0)
+  startDate      DateTime?
+  endDate        DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Document {
+  id         String   @id @default(cuid())
+  projectId  String
+  name       String
+  fileUrl    String
+  mimeType   String?
+  sizeBytes  Int?
+  uploadedBy String?
+  category   String?
+  createdAt  DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ActivityLog {
+  id              String   @id @default(cuid())
+  projectId       String
+  weekStartDate   DateTime
+  reportedBy      String
+  summary         String
+  accomplishments String?
+  plannedNextWeek String?
+  blockers        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  supportItems SupportItem[]
+}
+
+model SupportItem {
+  id            String   @id @default(cuid())
+  description   String
+  status        String   @default("OPEN")
+  owner         String?
+  dueDate       DateTime?
+  resolution    String?
+  priority      String   @default("MEDIUM")
+  projectId     String?
+  activityLogId String?
+  initiativeId  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  project     Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  activityLog ActivityLog? @relation(fields: [activityLogId], references: [id], onDelete: Cascade)
+  initiative  Initiative?  @relation(fields: [initiativeId], references: [id], onDelete: Cascade)
+}
+
+model RiskIssue {
+  id             String    @id @default(cuid())
+  projectId      String
+  type           String    @default("RISK")
+  title          String
+  description    String?
+  probability    String?
+  impact         String    @default("MEDIUM")
+  status         String    @default("OPEN")
+  owner          String?
+  mitigationPlan String?
+  dueDate        DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Mandays {
+  id              String   @id @default(cuid())
+  projectId       String   @unique
+  totalContracted Float    @default(0)
+  used            Float    @default(0)
+  billed          Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Initiative {
+  id                    String   @id @default(cuid())
+  clientId              String?
+  type                  String
+  name                  String
+  owner                 String
+  qualificationDecision String   @default("PENDING")
+  expectedRevenue       Float?
+  description           String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  client      Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  actionItems ActionItem[]
+  supportItems SupportItem[]
+}
+
+model ActionItem {
+  id           String    @id @default(cuid())
+  initiativeId String
+  title        String
+  description  String?
+  status       String    @default("PENDING")
+  owner        String
+  dueDate      DateTime?
+  updates      String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  initiative Initiative @relation(fields: [initiativeId], references: [id], onDelete: Cascade)
+}
