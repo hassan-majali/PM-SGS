@@ -49,6 +49,8 @@ model Deliverable {
   id            String   @id @default(cuid())
   projectId     String
   name          String
+  qty           Float    @default(1)
+  unitPrice     Float    @default(0)
   amount        Float
   attachmentUrl String?
   description   String?
@@ -63,6 +65,7 @@ model PaymentPlan {
   id            String   @id @default(cuid())
   projectId     String
   deliverableId String?
+  billedQty     Float?
   invoicingDate DateTime
   status        String   @default("PENDING")
   amount        Float

@@ -32,7 +32,11 @@ export interface Deliverable {
   id: string;
   projectId: string;
   name: string;
+  qty: number;
+  unitPrice: number;
   amount: number;
+  billedQty: number;
+  remainingQty: number;
   attachmentUrl?: string;
   description?: string;
   createdAt: string;
@@ -45,7 +49,8 @@ export interface PaymentPlan {
   id: string;
   projectId: string;
   deliverableId?: string;
-  deliverable?: { id: string; name: string };
+  deliverable?: { id: string; name: string; unitPrice: number; qty: number };
+  billedQty?: number;
   invoicingDate: string;
   status: PaymentStatus;
   amount: number;

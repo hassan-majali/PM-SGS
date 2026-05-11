@@ -13,7 +13,7 @@ export async function list(req: Request, res: Response, next: NextFunction) {
         ...(status ? { status: String(status) } : {}),
         ...(unbilledOnly === "true" ? { status: { in: ["PENDING", "IN_PROGRESS"] } } : {}),
       },
-      include: { deliverable: { select: { id: true, name: true } } },
+      include: { deliverable: { select: { id: true, name: true, unitPrice: true, qty: true } } },
       orderBy: { invoicingDate: "asc" },
     });
     res.json(items);
@@ -22,14 +22,25 @@ export async function list(req: Request, res: Response, next: NextFunction) {
 
 export async function create(req: Request, res: Response, next: NextFunction) {
   try {
+    const billedQty = req.body.billedQty ? parseFloat(req.body.billedQty) : null;
+    let amount = parseFloat(req.body.amount || 0);
+    if (req.body.deliverableId && billedQty) {
+      const deliverable = await prisma.deliverable.findUnique({ where: { id: req.body.deliverableId } });
+      if (deliverable) amount = billedQty * deliverable.unitPrice;
+    }
     const item = await prisma.paymentPlan.create({
       data: {
-        ...req.body,
         projectId: req.params.projectId,
-        amount: parseFloat(req.body.amount),
+        deliverableId: req.body.deliverableId || null,
+        billedQty,
+        amount,
         invoicingDate: new Date(req.body.invoicingDate),
+        status: req.body.status || "PENDING",
+        fiscalYear: req.body.fiscalYear,
+        notes: req.body.notes || null,
+        invoiceNumber: req.body.invoiceNumber || null,
       },
-      include: { deliverable: { select: { id: true, name: true } } },
+      include: { deliverable: { select: { id: true, name: true, unitPrice: true, qty: true } } },
     });
     res.status(201).json(item);
   } catch (e) { next(e); }

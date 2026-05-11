@@ -15,6 +15,8 @@ import { deliverablesApi } from "@/api/deliverables.api";
 import { formatCurrency } from "@/lib/utils";
 import type { Deliverable } from "@/types";
 
+type DeliverableForm = { name: string; description?: string; qty: number; unitPrice: number };
+
 function DeliverableRow({ d, projectId }: { d: Deliverable; projectId: string }) {
   const qc = useQueryClient();
   const [delOpen, setDelOpen] = useState(false);
@@ -30,13 +32,25 @@ function DeliverableRow({ d, projectId }: { d: Deliverable; projectId: string })
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["deliverables", projectId] }); setDelOpen(false); },
   });
 
+  const remainingPct = d.qty > 0 ? ((d.remainingQty / d.qty) * 100) : 100;
+
   return (
     <tr className="border-b border-border hover:bg-muted/20 transition-colors">
       <td className="py-3 px-4">
         <p className="font-medium text-sm">{d.name}</p>
         {d.description && <p className="text-xs text-muted-foreground">{d.description}</p>}
       </td>
+      <td className="py-3 px-4 text-right text-sm">{d.qty}</td>
+      <td className="py-3 px-4 text-right text-sm">{formatCurrency(d.unitPrice)}</td>
       <td className="py-3 px-4 text-right font-semibold text-sm">{formatCurrency(d.amount)}</td>
+      <td className="py-3 px-4 text-center text-sm">
+        <span className={d.billedQty > 0 ? "text-yellow-400" : "text-muted-foreground"}>{d.billedQty}</span>
+      </td>
+      <td className="py-3 px-4 text-center text-sm">
+        <span className={remainingPct < 20 ? "text-red-400 font-semibold" : remainingPct < 50 ? "text-yellow-400" : "text-green-400"}>
+          {d.remainingQty}
+        </span>
+      </td>
       <td className="py-3 px-4 text-center">
         {d.attachmentUrl ? (
           <a href={d.attachmentUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
@@ -61,7 +75,6 @@ function DeliverableRow({ d, projectId }: { d: Deliverable; projectId: string })
 
 export function DeliverablesTab({ projectId }: { projectId: string }) {
   const [formOpen, setFormOpen] = useState(false);
-  const [importing, setImporting] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
@@ -70,20 +83,22 @@ export function DeliverablesTab({ projectId }: { projectId: string }) {
     queryFn: () => deliverablesApi.list(projectId),
   });
 
-  const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<Partial<Deliverable>>();
+  const { register, handleSubmit, watch, reset, formState: { isSubmitting } } = useForm<DeliverableForm>({
+    defaultValues: { qty: 1, unitPrice: 0 },
+  });
+
+  const watchedQty = watch("qty") || 0;
+  const watchedPrice = watch("unitPrice") || 0;
+  const computedTotal = Number(watchedQty) * Number(watchedPrice);
 
   const createMut = useMutation({
-    mutationFn: (d: Partial<Deliverable>) => deliverablesApi.create(projectId, d),
+    mutationFn: (d: DeliverableForm) => deliverablesApi.create(projectId, { ...d, qty: Number(d.qty), unitPrice: Number(d.unitPrice) }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["deliverables", projectId] }); reset(); setFormOpen(false); },
   });
 
   const importMut = useMutation({
     mutationFn: (file: File) => deliverablesApi.importExcel(projectId, file),
-    onSuccess: (result) => {
-      qc.invalidateQueries({ queryKey: ["deliverables", projectId] });
-      setImporting(false);
-      alert(`Imported ${result.imported} deliverables`);
-    },
+    onSuccess: (result) => { qc.invalidateQueries({ queryKey: ["deliverables", projectId] }); alert(`Imported ${result.imported} deliverables`); },
   });
 
   const total = items?.reduce((s, d) => s + d.amount, 0) || 0;
@@ -95,14 +110,14 @@ export function DeliverablesTab({ projectId }: { projectId: string }) {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-semibold">Deliverables</h3>
-          <p className="text-sm text-muted-foreground">Total: {formatCurrency(total)}</p>
+          <p className="text-sm text-muted-foreground">Contract Total: {formatCurrency(total)}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => importRef.current?.click()}>
             <FileSpreadsheet className="h-4 w-4" />Import Excel
           </Button>
           <input ref={importRef} type="file" accept=".xlsx,.xls" className="hidden"
-            onChange={e => { if (e.target.files?.[0]) { setImporting(true); importMut.mutate(e.target.files[0]); } }} />
+            onChange={e => { if (e.target.files?.[0]) importMut.mutate(e.target.files[0]); }} />
           <Button size="sm" onClick={() => setFormOpen(true)}><Plus className="h-4 w-4" />Add Deliverable</Button>
         </div>
       </div>
@@ -116,7 +131,11 @@ export function DeliverablesTab({ projectId }: { projectId: string }) {
               <thead>
                 <tr className="border-b border-border bg-muted/30">
                   <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground">DELIVERABLE</th>
-                  <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground">AMOUNT</th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground">QTY</th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground">UNIT PRICE</th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground">TOTAL</th>
+                  <th className="text-center py-3 px-4 text-xs font-semibold text-muted-foreground">BILLED</th>
+                  <th className="text-center py-3 px-4 text-xs font-semibold text-muted-foreground">REMAINING</th>
                   <th className="text-center py-3 px-4 text-xs font-semibold text-muted-foreground">ATTACHMENT</th>
                   <th className="text-center py-3 px-4 text-xs font-semibold text-muted-foreground"></th>
                 </tr>
@@ -127,7 +146,14 @@ export function DeliverablesTab({ projectId }: { projectId: string }) {
               <tfoot>
                 <tr className="border-t border-border bg-muted/20">
                   <td className="py-3 px-4 text-sm font-semibold">Total</td>
+                  <td colSpan={2} />
                   <td className="py-3 px-4 text-right font-bold text-primary">{formatCurrency(total)}</td>
+                  <td className="py-3 px-4 text-center text-sm text-yellow-400 font-semibold">
+                    {items.reduce((s, d) => s + d.billedQty, 0)}
+                  </td>
+                  <td className="py-3 px-4 text-center text-sm text-green-400 font-semibold">
+                    {items.reduce((s, d) => s + d.remainingQty, 0)}
+                  </td>
                   <td colSpan={2} />
                 </tr>
               </tfoot>
@@ -145,15 +171,25 @@ export function DeliverablesTab({ projectId }: { projectId: string }) {
               <Input {...register("name", { required: true })} placeholder="Phase 1 Design" />
             </div>
             <div className="space-y-1">
-              <Label>Amount (USD) *</Label>
-              <Input {...register("amount", { required: true })} type="number" min="0" step="0.01" placeholder="50000" />
-            </div>
-            <div className="space-y-1">
               <Label>Description</Label>
               <Textarea {...register("description")} rows={2} placeholder="Description..." />
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>Quantity *</Label>
+                <Input {...register("qty", { required: true })} type="number" min="0" step="0.01" placeholder="1" />
+              </div>
+              <div className="space-y-1">
+                <Label>Unit Price (USD) *</Label>
+                <Input {...register("unitPrice", { required: true })} type="number" min="0" step="0.01" placeholder="50000" />
+              </div>
+            </div>
+            <div className="rounded-md bg-muted/30 px-4 py-3 flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Total</span>
+              <span className="text-lg font-bold text-primary">{formatCurrency(computedTotal)}</span>
+            </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={() => { reset(); setFormOpen(false); }}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Adding..." : "Add"}</Button>
             </DialogFooter>
           </form>

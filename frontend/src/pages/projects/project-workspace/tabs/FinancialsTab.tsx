@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Paperclip, ExternalLink, FileSpreadsheet } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,16 @@ import type { PaymentPlan, PaymentStatus } from "@/types";
 
 const STATUSES: PaymentStatus[] = ["PENDING", "IN_PROGRESS", "INVOICED", "COLLECTED"];
 
+type InvoiceForm = {
+  deliverableId: string;
+  billedQty: number;
+  invoicingDate: string;
+  status: PaymentStatus;
+  fiscalYear: string;
+  invoiceNumber?: string;
+  notes?: string;
+};
+
 function PaymentRow({ p, projectId }: { p: PaymentPlan; projectId: string }) {
   const qc = useQueryClient();
   const [delOpen, setDelOpen] = useState(false);
@@ -32,7 +42,11 @@ function PaymentRow({ p, projectId }: { p: PaymentPlan; projectId: string }) {
 
   const deleteMut = useMutation({
     mutationFn: () => paymentPlansApi.remove(projectId, p.id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["payment-plans", projectId] }); setDelOpen(false); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["payment-plans", projectId] });
+      qc.invalidateQueries({ queryKey: ["deliverables", projectId] });
+      setDelOpen(false);
+    },
   });
 
   const uploadMut = useMutation({
@@ -43,16 +57,13 @@ function PaymentRow({ p, projectId }: { p: PaymentPlan; projectId: string }) {
   return (
     <tr className="border-b border-border hover:bg-muted/20 transition-colors">
       <td className="py-3 px-3 text-sm">{p.deliverable?.name || "—"}</td>
+      <td className="py-3 px-3 text-sm text-right">{p.billedQty ?? "—"}</td>
       <td className="py-3 px-3 text-sm font-medium text-right">{formatCurrency(p.amount)}</td>
       <td className="py-3 px-3 text-sm text-center">{formatDate(p.invoicingDate)}</td>
       <td className="py-3 px-3 text-center">
         <Select value={p.status} onValueChange={v => updateMut.mutate({ status: v as PaymentStatus })}>
-          <SelectTrigger className="h-7 text-xs w-28">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-          </SelectContent>
+          <SelectTrigger className="h-7 text-xs w-28"><SelectValue /></SelectTrigger>
+          <SelectContent>{STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
         </Select>
       </td>
       <td className="py-3 px-3 text-sm text-center">{p.fiscalYear}</td>
@@ -72,7 +83,7 @@ function PaymentRow({ p, projectId }: { p: PaymentPlan; projectId: string }) {
         <Button size="icon" variant="ghost" className="h-7 w-7 hover:text-destructive" onClick={() => setDelOpen(true)}>
           <Trash2 className="h-3 w-3" />
         </Button>
-        <ConfirmDialog open={delOpen} onOpenChange={setDelOpen} title="Delete Entry" onConfirm={() => deleteMut.mutate()} loading={deleteMut.isPending} />
+        <ConfirmDialog open={delOpen} onOpenChange={setDelOpen} title="Delete Invoice Entry" onConfirm={() => deleteMut.mutate()} loading={deleteMut.isPending} />
       </td>
     </tr>
   );
@@ -101,34 +112,38 @@ export function FinancialsTab({ projectId }: { projectId: string }) {
     queryFn: () => deliverablesApi.list(projectId),
   });
 
-  const { register, handleSubmit, setValue, reset, formState: { isSubmitting } } = useForm<Partial<PaymentPlan>>({
-    defaultValues: { status: "PENDING", fiscalYear: getCurrentFiscalYear() },
+  const { register, handleSubmit, control, watch, reset, formState: { isSubmitting } } = useForm<InvoiceForm>({
+    defaultValues: { status: "PENDING", fiscalYear: getCurrentFiscalYear(), billedQty: 1 },
   });
 
+  const watchedDeliverableId = watch("deliverableId");
+  const watchedBilledQty = watch("billedQty");
+  const selectedDeliverable = deliverables?.find(d => d.id === watchedDeliverableId);
+  const computedAmount = selectedDeliverable ? Number(watchedBilledQty || 0) * selectedDeliverable.unitPrice : 0;
+
   const createMut = useMutation({
-    mutationFn: (d: Partial<PaymentPlan>) => paymentPlansApi.create(projectId, d),
+    mutationFn: (d: InvoiceForm) => paymentPlansApi.create(projectId, { ...d, billedQty: Number(d.billedQty) }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["payment-plans", projectId] });
       qc.invalidateQueries({ queryKey: ["payment-plans-summary", projectId] });
+      qc.invalidateQueries({ queryKey: ["deliverables", projectId] });
       reset(); setFormOpen(false);
     },
   });
 
   const importMut = useMutation({
     mutationFn: (file: File) => paymentPlansApi.importExcel(projectId, file),
-    onSuccess: (result) => {
-      qc.invalidateQueries({ queryKey: ["payment-plans", projectId] });
-      alert(`Imported ${result.imported} entries`);
-    },
+    onSuccess: (result) => { qc.invalidateQueries({ queryKey: ["payment-plans", projectId] }); alert(`Imported ${result.imported} entries`); },
   });
 
   if (isLoading) return <PageLoader />;
 
+  const allPlans = plans || [];
   const totals = {
-    forecasted: plans?.reduce((s, p) => s + p.amount, 0) || 0,
-    invoiced: plans?.filter(p => ["INVOICED", "COLLECTED"].includes(p.status)).reduce((s, p) => s + p.amount, 0) || 0,
-    collected: plans?.filter(p => p.status === "COLLECTED").reduce((s, p) => s + p.amount, 0) || 0,
-    pending: plans?.filter(p => p.status === "PENDING").reduce((s, p) => s + p.amount, 0) || 0,
+    forecasted: allPlans.reduce((s, p) => s + p.amount, 0),
+    invoiced: allPlans.filter(p => ["INVOICED", "COLLECTED"].includes(p.status)).reduce((s, p) => s + p.amount, 0),
+    collected: allPlans.filter(p => p.status === "COLLECTED").reduce((s, p) => s + p.amount, 0),
+    pending: allPlans.filter(p => p.status === "PENDING").reduce((s, p) => s + p.amount, 0),
   };
 
   return (
@@ -151,7 +166,7 @@ export function FinancialsTab({ projectId }: { projectId: string }) {
             <FileSpreadsheet className="h-4 w-4" />Import Excel
           </Button>
           <input ref={importRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={e => { if (e.target.files?.[0]) importMut.mutate(e.target.files[0]); }} />
-          <Button size="sm" onClick={() => setFormOpen(true)}><Plus className="h-4 w-4" />Add Entry</Button>
+          <Button size="sm" onClick={() => setFormOpen(true)}><Plus className="h-4 w-4" />Add Invoice</Button>
         </div>
       </div>
 
@@ -196,70 +211,132 @@ export function FinancialsTab({ projectId }: { projectId: string }) {
           <table className="w-full">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                {["Deliverable", "Amount", "Invoice Date", "Status", "Fiscal Year", "Attachment", ""].map(h => (
+                {["Deliverable", "Qty Billed", "Amount", "Invoice Date", "Status", "Fiscal Year", "Attachment", ""].map(h => (
                   <th key={h} className="py-3 px-3 text-xs font-semibold text-muted-foreground text-center first:text-left">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {plans?.map(p => <PaymentRow key={p.id} p={p} projectId={projectId} />)}
+              {allPlans.map(p => <PaymentRow key={p.id} p={p} projectId={projectId} />)}
             </tbody>
           </table>
-          {!plans?.length && (
-            <p className="text-sm text-muted-foreground text-center py-8">No payment entries{unbilledOnly ? " with pending/in-progress status" : ""}</p>
+          {!allPlans.length && (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No invoice entries{unbilledOnly ? " with pending/in-progress status" : ""}
+            </p>
           )}
         </CardContent>
       </Card>
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Add Payment Plan Entry</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Add Invoice Entry</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit(d => createMut.mutate(d))} className="space-y-4">
+            <div className="space-y-1">
+              <Label>Deliverable *</Label>
+              <Controller
+                control={control}
+                name="deliverableId"
+                rules={{ required: true }}
+                render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger><SelectValue placeholder="Select deliverable" /></SelectTrigger>
+                    <SelectContent>
+                      {deliverables?.map(d => (
+                        <SelectItem key={d.id} value={d.id} disabled={d.remainingQty <= 0}>
+                          {d.name} — {formatCurrency(d.unitPrice)}/unit · {d.remainingQty} remaining
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+
+            {selectedDeliverable && (
+              <div className="rounded-md bg-muted/30 px-4 py-3 text-sm space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Unit Price</span>
+                  <span>{formatCurrency(selectedDeliverable.unitPrice)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total Qty</span>
+                  <span>{selectedDeliverable.qty}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Already Billed</span>
+                  <span className="text-yellow-400">{selectedDeliverable.billedQty}</span>
+                </div>
+                <div className="flex justify-between font-semibold">
+                  <span className="text-muted-foreground">Available to Bill</span>
+                  <span className="text-green-400">{selectedDeliverable.remainingQty}</span>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2 space-y-1">
-                <Label>Deliverable</Label>
-                <Select onValueChange={v => setValue("deliverableId", v === "none" ? undefined : v)}>
-                  <SelectTrigger><SelectValue placeholder="Select deliverable (optional)" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {deliverables?.map(d => <SelectItem key={d.id} value={d.id}>{d.name} ({formatCurrency(d.amount)})</SelectItem>)}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-1">
+                <Label>Qty to Bill *</Label>
+                <Input
+                  {...register("billedQty", { required: true, min: 0.01, max: selectedDeliverable?.remainingQty })}
+                  type="number" min="0.01" step="0.01"
+                  max={selectedDeliverable?.remainingQty}
+                  placeholder="1"
+                />
               </div>
               <div className="space-y-1">
-                <Label>Amount *</Label>
-                <Input {...register("amount", { required: true })} type="number" min="0" step="0.01" />
+                <Label>Invoice Amount</Label>
+                <div className="h-10 rounded-md border border-border bg-muted/30 px-3 flex items-center font-semibold text-primary">
+                  {formatCurrency(computedAmount)}
+                </div>
               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label>Invoice Date *</Label>
                 <Input {...register("invoicingDate", { required: true })} type="date" />
               </div>
               <div className="space-y-1">
                 <Label>Status</Label>
-                <Select onValueChange={v => setValue("status", v as PaymentStatus)} defaultValue="PENDING">
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                </Select>
+                <Controller
+                  control={control}
+                  name="status"
+                  render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
               <div className="space-y-1">
                 <Label>Fiscal Year</Label>
-                <Select onValueChange={v => setValue("fiscalYear", v)} defaultValue={getCurrentFiscalYear()}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{fyOptions.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
-                </Select>
+                <Controller
+                  control={control}
+                  name="fiscalYear"
+                  render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{fyOptions.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
-              <div className="col-span-2 space-y-1">
+              <div className="space-y-1">
                 <Label>Invoice Number</Label>
                 <Input {...register("invoiceNumber")} placeholder="INV-001" />
               </div>
-              <div className="col-span-2 space-y-1">
-                <Label>Notes</Label>
-                <Textarea {...register("notes")} rows={2} />
-              </div>
             </div>
+
+            <div className="space-y-1">
+              <Label>Notes</Label>
+              <Textarea {...register("notes")} rows={2} />
+            </div>
+
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Adding..." : "Add Entry"}</Button>
+              <Button type="button" variant="outline" onClick={() => { reset(); setFormOpen(false); }}>Cancel</Button>
+              <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Adding..." : "Add Invoice"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
