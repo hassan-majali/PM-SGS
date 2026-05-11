@@ -91,7 +91,7 @@ function PaymentRow({ p, projectId }: { p: PaymentPlan; projectId: string }) {
 
 export function FinancialsTab({ projectId }: { projectId: string }) {
   const [formOpen, setFormOpen] = useState(false);
-  const [fyFilter, setFyFilter] = useState(getCurrentFiscalYear());
+  const [fyFilter, setFyFilter] = useState("all");
   const [unbilledOnly, setUnbilledOnly] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
@@ -99,7 +99,7 @@ export function FinancialsTab({ projectId }: { projectId: string }) {
 
   const { data: plans, isLoading } = useQuery({
     queryKey: ["payment-plans", projectId, fyFilter, unbilledOnly],
-    queryFn: () => paymentPlansApi.list(projectId, { fiscalYear: fyFilter || undefined, unbilledOnly }),
+    queryFn: () => paymentPlansApi.list(projectId, { fiscalYear: fyFilter === "all" ? undefined : fyFilter, unbilledOnly }),
   });
 
   const { data: summary } = useQuery({
@@ -153,7 +153,7 @@ export function FinancialsTab({ projectId }: { projectId: string }) {
           <Select value={fyFilter} onValueChange={setFyFilter}>
             <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Years</SelectItem>
+              <SelectItem value="all">All Years</SelectItem>
               {fyOptions.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
             </SelectContent>
           </Select>
