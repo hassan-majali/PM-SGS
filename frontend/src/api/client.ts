@@ -31,12 +31,14 @@ api.interceptors.request.use((config) => {
 
 let _refreshing: Promise<string | null> | null = null;
 
-// On 401, attempt a token refresh once then retry the original request
+// On 401, attempt a token refresh once then retry the original request.
+// Skip auth endpoints to avoid infinite loops.
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config;
-    if (error.response?.status === 401 && !original._retried) {
+    const isAuthEndpoint = original.url?.includes("/auth/");
+    if (error.response?.status === 401 && !original._retried && !isAuthEndpoint) {
       original._retried = true;
       try {
         if (!_refreshing) {
@@ -56,7 +58,7 @@ api.interceptors.response.use(
         }
       } catch {
         setAccessToken(null);
-        window.location.href = "/login";
+        // Don't redirect here — ProtectedRoute handles it when user becomes null
       }
     }
     return Promise.reject(error);
