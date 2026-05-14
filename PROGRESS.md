@@ -10,6 +10,8 @@
 | Backend (Railway) | ✅ Deployed & Running |
 | Frontend (Vercel) | ✅ Deployed & Running |
 | PostgreSQL Database | ✅ Live on Railway |
+| Authentication | ✅ JWT-based login fully live |
+| User Management | ✅ Admin Center live |
 | CORS | ✅ Configured & Working |
 | End-to-End Testing | ⏳ In Progress |
 
@@ -23,7 +25,21 @@
 - [x] Frontend deployed on Vercel
 - [x] PostgreSQL running on Railway
 - [x] CORS configured via `ALLOWED_ORIGINS` env var
-- [x] SSH key auth to GitHub repo
+- [x] GitHub remote configured via HTTPS + PAT
+
+### Authentication & User Management (2026-05-14)
+- [x] JWT access token (1h) + refresh token (7d, httpOnly cookie)
+- [x] bcrypt password hashing (12 salt rounds)
+- [x] Password complexity policy enforced (uppercase + lowercase + number + special char, min 8)
+- [x] Login page (`/login`) with show/hide password toggle
+- [x] Session restore on page refresh via refresh cookie
+- [x] Auto token refresh interceptor in API client (silent, no page reload)
+- [x] ProtectedRoute — redirects unauthenticated users to `/login`
+- [x] AdminRoute — redirects non-admins away from `/admin`
+- [x] Logout button in sidebar
+- [x] Admin Center (`/admin`) — list, create, role change, activate/deactivate, reset password
+- [x] Default admin seeded on first deploy (`admin@pmportal.com`)
+- [x] Seed runs idempotently on every Railway deploy
 
 ### Client Management
 - [x] Create a client
@@ -50,20 +66,33 @@
 
 | Date | Bug | Root Cause | Fix Applied |
 |---|---|---|---|
-| 2026-05-11 | TypeScript `string \| string[]` on req.params | `@types/express` v5 incompatibility | Downgraded to v4 |
-| 2026-05-11 | nixpacks `--workspace=backend` override | nixpacks config conflict | Added nixpacks.toml then switched to Dockerfile |
+| 2026-05-11 | TypeScript `string \| string[]` on req.params | `@types/express` v5 incompatibility | Downgraded to v4, added `String()` coercion on all req.params |
+| 2026-05-11 | nixpacks build override | nixpacks config conflict | Switched to Dockerfile |
 | 2026-05-11 | `package-lock.json` out of sync | Stale lockfile | Ran `npm install` to regenerate |
 | 2026-05-11 | Prisma OpenSSL missing at runtime | Alpine image lacks OpenSSL | Switched to `node:20-slim` + installed OpenSSL |
 | 2026-05-11 | `prisma migrate deploy` no-op | Wrong migration strategy | Switched to `prisma db push` |
 | 2026-05-11 | `import.meta.env` TypeScript error on Vercel | Missing vite types | Added `vite-env.d.ts` + `"types": ["vite/client"]` |
 | 2026-05-11 | Financials tab blank | Route conflict — `summary` matched as `/:id` | Moved `summary` route before `/:id` |
 | 2026-05-11 | Financials tab crash | Radix `Select.Item` rejects `value=""` | Changed empty string to `"all"` |
+| 2026-05-14 | Railway healthcheck failing after auth added | `/api/v1/clients` now returns 401 | Added public `/health` endpoint, updated `railway.toml` |
+| 2026-05-14 | Server never started on Railway | `npx prisma db seed` has no command without `prisma.seed` in package.json | Added `"prisma": { "seed": "tsx prisma/seed.ts" }` to package.json |
+| 2026-05-14 | Login page reloading every 2 seconds | 401 interceptor triggered `window.location.href` on auth endpoint failure | Skip interceptor for `/auth/` endpoints, removed forced redirect |
+| 2026-05-14 | Healthcheck timeout too short for seed + db push | Default 30s window not enough for startup commands | Increased `healthcheckTimeout` to 120s in `railway.toml` |
 
 ---
 
 ## ⏳ Pending Testing Checklist
 
-### Clients
+### Authentication
+- [ ] Login with admin credentials
+- [ ] Verify redirect to dashboard after login
+- [ ] Verify unauthenticated users redirected to `/login`
+- [ ] Verify session persists after page refresh
+- [ ] Verify logout clears session and redirects to `/login`
+- [ ] Test Admin Center: create user, change role, deactivate, reset password
+- [ ] Verify non-admin users cannot access `/admin`
+
+### Clients & Projects
 - [ ] Create a client
 - [ ] Open client workspace
 - [ ] Create a project from within the client
@@ -75,13 +104,10 @@
 
 ### Financials Tab
 - [ ] Open tab — confirm not blank
-- [ ] Click Add Invoice
-- [ ] Select deliverable — verify unit price, qty, remaining shown correctly
-- [ ] Enter qty to bill — verify amount auto-computes
-- [ ] Save invoice and confirm it appears in table
-- [ ] Check Deliverables tab — billed qty should increase, remaining should decrease
-- [ ] Change invoice status: PENDING → IN_PROGRESS → INVOICED → COLLECTED
-- [ ] Verify summary cards update (Forecasted / Invoiced / Collected / Pending)
+- [ ] Add invoice, select deliverable, enter qty
+- [ ] Save and verify billed/remaining updates on Deliverables tab
+- [ ] Cycle status: PENDING → IN_PROGRESS → INVOICED → COLLECTED
+- [ ] Verify summary cards update
 
 ### Other Tabs
 - [ ] Resources — add a resource
@@ -101,13 +127,11 @@
 
 ## 🔜 Next Steps (Priority Order)
 
-1. Complete full end-to-end testing of all 8 tabs
+1. Complete full end-to-end testing of all tabs
 2. Fix any bugs found during testing
 3. Test Excel import on Deliverables
 4. Test PDF export on Initiatives
-5. Add authentication (login/logout) — not yet implemented
-6. Add user roles (admin / viewer) — planned
-7. Polish Dashboard charts with real data
+5. Polish Dashboard charts with real data
 
 ---
 
@@ -115,4 +139,5 @@
 
 | Date | What Was Done | Next Step |
 |---|---|---|
-| 2026-05-11 | Fixed Financials tab (route conflict + Select crash). Aligned data model: qty/unitPrice on Deliverable, billedQty on PaymentPlan. Deployed to Railway + Vercel. | Run full end-to-end testing on all tabs |
+| 2026-05-11 | Fixed Financials tab (route conflict + Select crash). Aligned data model. Deployed to Railway + Vercel. | Run full end-to-end testing |
+| 2026-05-14 | Built full auth system — Phase 1 (backend JWT + bcrypt + RBAC), Phase 2 (frontend login + auth context + protected routes), Phase 3 (Admin Center UI). Fixed 4 Railway deployment issues along the way. All three phases live in production. | End-to-end test auth flows, then continue tab testing |
