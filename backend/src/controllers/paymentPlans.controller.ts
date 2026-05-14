@@ -8,7 +8,7 @@ export async function list(req: Request, res: Response, next: NextFunction) {
     const { fiscalYear, status, unbilledOnly } = req.query;
     const items = await prisma.paymentPlan.findMany({
       where: {
-        projectId: req.params.projectId,
+        projectId: String(req.params.projectId),
         ...(fiscalYear ? { fiscalYear: String(fiscalYear) } : {}),
         ...(status ? { status: String(status) } : {}),
         ...(unbilledOnly === "true" ? { status: { in: ["PENDING", "IN_PROGRESS"] } } : {}),
@@ -30,7 +30,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
     }
     const item = await prisma.paymentPlan.create({
       data: {
-        projectId: req.params.projectId,
+        projectId: String(req.params.projectId),
         deliverableId: req.body.deliverableId || null,
         billedQty,
         amount,
@@ -49,7 +49,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
 export async function get(req: Request, res: Response, next: NextFunction) {
   try {
     const item = await prisma.paymentPlan.findUniqueOrThrow({
-      where: { id: req.params.id },
+      where: { id: String(req.params.id) },
       include: { deliverable: true },
     });
     res.json(item);
@@ -62,7 +62,7 @@ export async function update(req: Request, res: Response, next: NextFunction) {
     if (data.amount) data.amount = parseFloat(String(data.amount));
     if (data.invoicingDate) data.invoicingDate = new Date(String(data.invoicingDate));
     const item = await prisma.paymentPlan.update({
-      where: { id: req.params.id },
+      where: { id: String(req.params.id) },
       data,
       include: { deliverable: { select: { id: true, name: true } } },
     });
@@ -72,7 +72,7 @@ export async function update(req: Request, res: Response, next: NextFunction) {
 
 export async function remove(req: Request, res: Response, next: NextFunction) {
   try {
-    await prisma.paymentPlan.delete({ where: { id: req.params.id } });
+    await prisma.paymentPlan.delete({ where: { id: String(req.params.id) } });
     res.status(204).send();
   } catch (e) { next(e); }
 }
@@ -82,7 +82,7 @@ export async function uploadAttachment(req: Request, res: Response, next: NextFu
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     const url = `/uploads/payment-plans/${req.file.filename}`;
     const item = await prisma.paymentPlan.update({
-      where: { id: req.params.id },
+      where: { id: String(req.params.id) },
       data: { attachmentUrl: url },
     });
     res.json(item);
@@ -94,7 +94,7 @@ export async function summary(req: Request, res: Response, next: NextFunction) {
     const { fiscalYear } = req.query;
     const plans = await prisma.paymentPlan.findMany({
       where: {
-        projectId: req.params.projectId,
+        projectId: String(req.params.projectId),
         ...(fiscalYear ? { fiscalYear: String(fiscalYear) } : {}),
       },
     });
@@ -131,7 +131,7 @@ export async function importExcel(req: Request, res: Response, next: NextFunctio
 
       const p = await prisma.paymentPlan.create({
         data: {
-          projectId: req.params.projectId,
+          projectId: String(req.params.projectId),
           amount,
           invoicingDate: new Date(String(invoicingDate)),
           status: ["PENDING", "IN_PROGRESS", "INVOICED", "COLLECTED"].includes(status) ? status : "PENDING",

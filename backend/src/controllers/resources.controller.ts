@@ -8,7 +8,7 @@ function withCost(r: { weeklyHours: number; costPerHour: number; utilizationPct:
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
     const items = await prisma.resource.findMany({
-      where: { projectId: req.params.projectId },
+      where: { projectId: String(req.params.projectId) },
       orderBy: { createdAt: "desc" },
     });
     res.json(items.map(withCost));
@@ -20,7 +20,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
     const item = await prisma.resource.create({
       data: {
         ...req.body,
-        projectId: req.params.projectId,
+        projectId: String(req.params.projectId),
         utilizationPct: parseFloat(req.body.utilizationPct ?? 0),
         weeklyHours: parseFloat(req.body.weeklyHours ?? 0),
         costPerHour: parseFloat(req.body.costPerHour ?? 0),
@@ -34,7 +34,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
 
 export async function get(req: Request, res: Response, next: NextFunction) {
   try {
-    const item = await prisma.resource.findUniqueOrThrow({ where: { id: req.params.id } });
+    const item = await prisma.resource.findUniqueOrThrow({ where: { id: String(req.params.id) } });
     res.json(withCost(item));
   } catch (e) { next(e); }
 }
@@ -47,14 +47,14 @@ export async function update(req: Request, res: Response, next: NextFunction) {
     if (data.costPerHour !== undefined) data.costPerHour = parseFloat(String(data.costPerHour));
     if (data.startDate) data.startDate = new Date(String(data.startDate));
     if (data.endDate) data.endDate = new Date(String(data.endDate));
-    const item = await prisma.resource.update({ where: { id: req.params.id }, data });
+    const item = await prisma.resource.update({ where: { id: String(req.params.id) }, data });
     res.json(withCost(item));
   } catch (e) { next(e); }
 }
 
 export async function remove(req: Request, res: Response, next: NextFunction) {
   try {
-    await prisma.resource.delete({ where: { id: req.params.id } });
+    await prisma.resource.delete({ where: { id: String(req.params.id) } });
     res.status(204).send();
   } catch (e) { next(e); }
 }

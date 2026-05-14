@@ -3,9 +3,9 @@ import prisma from "../prisma";
 
 export async function get(req: Request, res: Response, next: NextFunction) {
   try {
-    let mandays = await prisma.mandays.findUnique({ where: { projectId: req.params.projectId } });
+    let mandays = await prisma.mandays.findUnique({ where: { projectId: String(req.params.projectId) } });
     if (!mandays) {
-      mandays = await prisma.mandays.create({ data: { projectId: req.params.projectId } });
+      mandays = await prisma.mandays.create({ data: { projectId: String(req.params.projectId) } });
     }
     res.json({ ...mandays, remaining: mandays.totalContracted - mandays.used });
   } catch (e) { next(e); }
@@ -19,9 +19,9 @@ export async function update(req: Request, res: Response, next: NextFunction) {
     if (req.body.billed !== undefined) data.billed = parseFloat(req.body.billed);
 
     const mandays = await prisma.mandays.upsert({
-      where: { projectId: req.params.projectId },
+      where: { projectId: String(req.params.projectId) },
       update: data,
-      create: { projectId: req.params.projectId, ...data },
+      create: { projectId: String(req.params.projectId), ...data },
     });
     res.json({ ...mandays, remaining: mandays.totalContracted - mandays.used });
   } catch (e) { next(e); }

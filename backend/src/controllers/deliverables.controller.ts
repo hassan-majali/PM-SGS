@@ -6,12 +6,13 @@ import fs from "fs";
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
     const items = await prisma.deliverable.findMany({
-      where: { projectId: req.params.projectId },
+      where: { projectId: String(req.params.projectId) },
       include: { paymentPlans: { select: { billedQty: true } } },
       orderBy: { createdAt: "desc" },
     });
-    const result = items.map(({ paymentPlans, ...d }) => {
-      const billedQty = paymentPlans.reduce((s, p) => s + (p.billedQty || 0), 0);
+    const result = items.map((item) => {
+      const billedQty = item.paymentPlans.reduce((s: number, p: { billedQty: number | null }) => s + (p.billedQty || 0), 0);
+      const { paymentPlans: _pp, ...d } = item;
       return { ...d, billedQty, remainingQty: d.qty - billedQty };
     });
     res.json(result);
@@ -24,7 +25,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
     const unitPrice = parseFloat(req.body.unitPrice ?? 0);
     const amount = qty * unitPrice;
     const item = await prisma.deliverable.create({
-      data: { name: req.body.name, description: req.body.description, projectId: req.params.projectId, qty, unitPrice, amount },
+      data: { name: req.body.name, description: req.body.description, projectId: String(req.params.projectId), qty, unitPrice, amount },
     });
     res.status(201).json({ ...item, billedQty: 0, remainingQty: item.qty });
   } catch (e) { next(e); }
@@ -32,7 +33,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
 
 export async function get(req: Request, res: Response, next: NextFunction) {
   try {
-    const item = await prisma.deliverable.findUniqueOrThrow({ where: { id: req.params.id } });
+    const item = await prisma.deliverable.findUniqueOrThrow({ where: { id: String(req.params.id) } });
     res.json(item);
   } catch (e) { next(e); }
 }
@@ -45,17 +46,17 @@ export async function update(req: Request, res: Response, next: NextFunction) {
     if (qty !== undefined) data.qty = qty;
     if (unitPrice !== undefined) data.unitPrice = unitPrice;
     if (qty !== undefined || unitPrice !== undefined) {
-      const existing = await prisma.deliverable.findUnique({ where: { id: req.params.id } });
+      const existing = await prisma.deliverable.findUnique({ where: { id: String(req.params.id) } });
       if (existing) data.amount = (qty ?? existing.qty) * (unitPrice ?? existing.unitPrice);
     }
-    const item = await prisma.deliverable.update({ where: { id: req.params.id }, data });
+    const item = await prisma.deliverable.update({ where: { id: String(req.params.id) }, data });
     res.json(item);
   } catch (e) { next(e); }
 }
 
 export async function remove(req: Request, res: Response, next: NextFunction) {
   try {
-    await prisma.deliverable.delete({ where: { id: req.params.id } });
+    await prisma.deliverable.delete({ where: { id: String(req.params.id) } });
     res.status(204).send();
   } catch (e) { next(e); }
 }
@@ -64,7 +65,7 @@ export async function uploadAttachment(req: Request, res: Response, next: NextFu
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     const url = `/uploads/deliverables/${req.file.filename}`;
-    const item = await prisma.deliverable.update({ where: { id: req.params.id }, data: { attachmentUrl: url } });
+    const item = await prisma.deliverable.update({ where: { id: String(req.params.id) }, data: { attachmentUrl: url } });
     res.json(item);
   } catch (e) { next(e); }
 }
@@ -83,7 +84,7 @@ export async function importExcel(req: Request, res: Response, next: NextFunctio
       const unitPrice = parseFloat(String(row["unitPrice"] || row["Unit Price"] || row["price"] || 0));
       const amount = qty * unitPrice;
       const d = await prisma.deliverable.create({
-        data: { name, qty, unitPrice, amount, projectId: req.params.projectId, description: String(row["description"] || row["Description"] || "") },
+        data: { name, qty, unitPrice, amount, projectId: String(req.params.projectId), description: String(row["description"] || row["Description"] || "") },
       });
       created.push(d);
     }

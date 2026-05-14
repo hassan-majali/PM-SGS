@@ -21,7 +21,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
 export async function get(req: Request, res: Response, next: NextFunction) {
   try {
     const client = await prisma.client.findUniqueOrThrow({
-      where: { id: req.params.id },
+      where: { id: String(req.params.id) },
       include: {
         projects: { orderBy: { createdAt: "desc" } },
         initiatives: { orderBy: { createdAt: "desc" } },
@@ -34,7 +34,7 @@ export async function get(req: Request, res: Response, next: NextFunction) {
 export async function update(req: Request, res: Response, next: NextFunction) {
   try {
     const client = await prisma.client.update({
-      where: { id: req.params.id },
+      where: { id: String(req.params.id) },
       data: req.body,
     });
     res.json(client);
@@ -43,7 +43,7 @@ export async function update(req: Request, res: Response, next: NextFunction) {
 
 export async function remove(req: Request, res: Response, next: NextFunction) {
   try {
-    await prisma.client.delete({ where: { id: req.params.id } });
+    await prisma.client.delete({ where: { id: String(req.params.id) } });
     res.status(204).send();
   } catch (e) { next(e); }
 }

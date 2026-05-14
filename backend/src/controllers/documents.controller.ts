@@ -6,7 +6,7 @@ import path from "path";
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
     const items = await prisma.document.findMany({
-      where: { projectId: req.params.projectId },
+      where: { projectId: String(req.params.projectId) },
       orderBy: { createdAt: "desc" },
     });
     res.json(items);
@@ -18,7 +18,7 @@ export async function upload(req: Request, res: Response, next: NextFunction) {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     const item = await prisma.document.create({
       data: {
-        projectId: req.params.projectId,
+        projectId: String(req.params.projectId),
         name: req.body.name || req.file.originalname,
         fileUrl: `/uploads/documents/${req.file.filename}`,
         mimeType: req.file.mimetype,
@@ -33,10 +33,10 @@ export async function upload(req: Request, res: Response, next: NextFunction) {
 
 export async function remove(req: Request, res: Response, next: NextFunction) {
   try {
-    const doc = await prisma.document.findUniqueOrThrow({ where: { id: req.params.id } });
+    const doc = await prisma.document.findUniqueOrThrow({ where: { id: String(req.params.id) } });
     const filePath = path.join(__dirname, "../../", doc.fileUrl);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    await prisma.document.delete({ where: { id: req.params.id } });
+    await prisma.document.delete({ where: { id: String(req.params.id) } });
     res.status(204).send();
   } catch (e) { next(e); }
 }

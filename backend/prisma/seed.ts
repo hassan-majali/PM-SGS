@@ -1,10 +1,28 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log("Seeding database...");
 
+  // ── Default Admin User ──────────────────────────────────────────────────────
+  const adminEmail = "admin@pmportal.com";
+  const existing = await prisma.user.findUnique({ where: { email: adminEmail } });
+  if (!existing) {
+    const passwordHash = await bcrypt.hash("Admin@1234!", 12);
+    await prisma.user.create({
+      data: { email: adminEmail, name: "Admin", passwordHash, role: "ADMIN", status: "ACTIVE" },
+    });
+    console.log("✅ Default admin created:");
+    console.log("   Email:    admin@pmportal.com");
+    console.log("   Password: Admin@1234!");
+    console.log("   ⚠️  Change this password after first login!");
+  } else {
+    console.log("ℹ️  Admin user already exists, skipping.");
+  }
+
+  // ── Sample Data ─────────────────────────────────────────────────────────────
   const client = await prisma.client.create({
     data: {
       name: "Acme Corporation",
@@ -30,20 +48,10 @@ async function main() {
 
   await prisma.deliverable.createMany({
     data: [
-      { projectId: project.id, name: "Requirements & Architecture", amount: 75000 },
-      { projectId: project.id, name: "Platform Development Phase 1", amount: 200000 },
-      { projectId: project.id, name: "Integration & Testing", amount: 125000 },
-      { projectId: project.id, name: "Go-Live & Hypercare", amount: 100000 },
-    ],
-  });
-
-  await prisma.paymentPlan.createMany({
-    data: [
-      { projectId: project.id, amount: 75000, invoicingDate: new Date("2025-02-01"), status: "COLLECTED", fiscalYear: "FY2025" },
-      { projectId: project.id, amount: 100000, invoicingDate: new Date("2025-05-01"), status: "INVOICED", fiscalYear: "FY2025" },
-      { projectId: project.id, amount: 100000, invoicingDate: new Date("2025-08-01"), status: "PENDING", fiscalYear: "FY2025" },
-      { projectId: project.id, amount: 125000, invoicingDate: new Date("2025-11-01"), status: "PENDING", fiscalYear: "FY2025" },
-      { projectId: project.id, amount: 100000, invoicingDate: new Date("2026-02-01"), status: "PENDING", fiscalYear: "FY2026" },
+      { projectId: project.id, name: "Requirements & Architecture", qty: 1, unitPrice: 75000, amount: 75000 },
+      { projectId: project.id, name: "Platform Development Phase 1", qty: 1, unitPrice: 200000, amount: 200000 },
+      { projectId: project.id, name: "Integration & Testing", qty: 1, unitPrice: 125000, amount: 125000 },
+      { projectId: project.id, name: "Go-Live & Hypercare", qty: 1, unitPrice: 100000, amount: 100000 },
     ],
   });
 
@@ -87,22 +95,19 @@ async function main() {
       owner: "Sarah Wilson",
       qualificationDecision: "QUALIFIED",
       expectedRevenue: 1200000,
-      description: "Large-scale cloud migration opportunity. Client issued RFP for full AWS migration of on-prem infrastructure.",
+      description: "Large-scale cloud migration opportunity.",
     },
   });
 
   await prisma.actionItem.createMany({
     data: [
-      { initiativeId: initiative.id, title: "Complete technical assessment", owner: "Alice Johnson", status: "COMPLETED", dueDate: new Date("2025-06-15"), updates: "Assessment complete. Identified 47 workloads for migration." },
-      { initiativeId: initiative.id, title: "Submit commercial proposal", owner: "Sarah Wilson", status: "IN_PROGRESS", dueDate: new Date("2025-06-30"), updates: "Pricing model drafted, pending legal review." },
+      { initiativeId: initiative.id, title: "Complete technical assessment", owner: "Alice Johnson", status: "COMPLETED", dueDate: new Date("2025-06-15"), updates: "Assessment complete." },
+      { initiativeId: initiative.id, title: "Submit commercial proposal", owner: "Sarah Wilson", status: "IN_PROGRESS", dueDate: new Date("2025-06-30") },
       { initiativeId: initiative.id, title: "Arrange client presentation", owner: "Jane Doe", status: "PENDING", dueDate: new Date("2025-07-10") },
     ],
   });
 
-  console.log("Seed complete!");
-  console.log(`Created client: ${client.name}`);
-  console.log(`Created project: ${project.name}`);
-  console.log(`Created initiative: ${initiative.name}`);
+  console.log("✅ Seed complete!");
 }
 
 main()

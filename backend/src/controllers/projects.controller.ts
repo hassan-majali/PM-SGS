@@ -37,7 +37,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
 export async function get(req: Request, res: Response, next: NextFunction) {
   try {
     const project = await prisma.project.findUniqueOrThrow({
-      where: { id: req.params.id },
+      where: { id: String(req.params.id) },
       include: { client: true },
     });
     res.json(project);
@@ -51,7 +51,7 @@ export async function update(req: Request, res: Response, next: NextFunction) {
     if (data.endDate) data.endDate = new Date(String(data.endDate));
     if (data.budget) data.budget = parseFloat(String(data.budget));
     const project = await prisma.project.update({
-      where: { id: req.params.id },
+      where: { id: String(req.params.id) },
       data,
       include: { client: { select: { id: true, name: true } } },
     });
@@ -61,14 +61,14 @@ export async function update(req: Request, res: Response, next: NextFunction) {
 
 export async function remove(req: Request, res: Response, next: NextFunction) {
   try {
-    await prisma.project.delete({ where: { id: req.params.id } });
+    await prisma.project.delete({ where: { id: String(req.params.id) } });
     res.status(204).send();
   } catch (e) { next(e); }
 }
 
 export async function dashboard(req: Request, res: Response, next: NextFunction) {
   try {
-    const id = req.params.id;
+    const id = String(req.params.id);
 
     const [project, paymentPlans, resources, risks, mandays] = await Promise.all([
       prisma.project.findUniqueOrThrow({ where: { id }, include: { client: true } }),

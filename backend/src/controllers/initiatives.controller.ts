@@ -36,7 +36,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
 export async function get(req: Request, res: Response, next: NextFunction) {
   try {
     const item = await prisma.initiative.findUniqueOrThrow({
-      where: { id: req.params.id },
+      where: { id: String(req.params.id) },
       include: {
         client: true,
         actionItems: { orderBy: { createdAt: "asc" } },
@@ -52,7 +52,7 @@ export async function update(req: Request, res: Response, next: NextFunction) {
     const data: Record<string, unknown> = { ...req.body };
     if (data.expectedRevenue !== undefined) data.expectedRevenue = parseFloat(String(data.expectedRevenue));
     const item = await prisma.initiative.update({
-      where: { id: req.params.id },
+      where: { id: String(req.params.id) },
       data,
       include: { client: { select: { id: true, name: true } } },
     });
@@ -62,7 +62,7 @@ export async function update(req: Request, res: Response, next: NextFunction) {
 
 export async function remove(req: Request, res: Response, next: NextFunction) {
   try {
-    await prisma.initiative.delete({ where: { id: req.params.id } });
+    await prisma.initiative.delete({ where: { id: String(req.params.id) } });
     res.status(204).send();
   } catch (e) { next(e); }
 }
