@@ -10,6 +10,8 @@ import { ProjectsListPage } from "./pages/projects/ProjectsListPage";
 import { ProjectWorkspacePage } from "./pages/projects/project-workspace/ProjectWorkspacePage";
 import { InitiativesListPage } from "./pages/initiatives/InitiativesListPage";
 import { InitiativeWorkspacePage } from "./pages/initiatives/InitiativeWorkspacePage";
+import { AdminPage } from "./pages/admin/AdminPage";
+import { AdminRoute } from "./components/auth/AdminRoute";
 
 export default function App() {
   return (
@@ -26,6 +28,9 @@ export default function App() {
               <Route path="/projects/:id" element={<ProjectWorkspacePage />} />
               <Route path="/initiatives" element={<InitiativesListPage />} />
               <Route path="/initiatives/:id" element={<InitiativeWorkspacePage />} />
+              <Route element={<AdminRoute />}>
+                <Route path="/admin" element={<AdminPage />} />
+              </Route>
             </Route>
           </Route>
         </Routes>
