@@ -20,6 +20,8 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
+app.get("/health", (_req, res) => { res.json({ ok: true }); });
+
 // Public auth routes (login, refresh, logout)
 app.use("/api/v1/auth", authRoutes);
 
