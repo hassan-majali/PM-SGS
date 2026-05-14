@@ -22,7 +22,13 @@ async function main() {
     console.log("ℹ️  Admin user already exists, skipping.");
   }
 
-  // ── Sample Data ─────────────────────────────────────────────────────────────
+  // ── Sample Data (only on first run) ─────────────────────────────────────────
+  const clientCount = await prisma.client.count();
+  if (clientCount > 0) {
+    console.log("ℹ️  Sample data already exists, skipping.");
+    return;
+  }
+
   const client = await prisma.client.create({
     data: {
       name: "Acme Corporation",
