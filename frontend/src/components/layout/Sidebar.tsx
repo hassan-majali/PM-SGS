@@ -1,7 +1,8 @@
-import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Building2, FolderKanban, Lightbulb, ChevronLeft, ChevronRight } from "lucide-react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { LayoutDashboard, Building2, FolderKanban, Lightbulb, ChevronLeft, ChevronRight, LogOut, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { useAuth } from "../../context/AuthContext";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -13,6 +14,13 @@ const navItems = [
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  async function handleLogout() {
+    await logout();
+    navigate("/login", { replace: true });
+  }
 
   return (
     <aside className={cn(
@@ -59,11 +67,32 @@ export function Sidebar() {
         {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
       </button>
 
-      {!collapsed && (
-        <div className="p-4 border-t border-border">
-          <p className="text-xs text-muted-foreground text-center">v1.0.0 Internal</p>
-        </div>
-      )}
+      <div className="p-3 border-t border-border space-y-1">
+        {user?.role === "ADMIN" && (
+          <NavLink
+            to="/admin"
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+              location.pathname.startsWith("/admin")
+                ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            <Shield className="h-4 w-4 flex-shrink-0" />
+            {!collapsed && <span>Admin</span>}
+          </NavLink>
+        )}
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200"
+        >
+          <LogOut className="h-4 w-4 flex-shrink-0" />
+          {!collapsed && <span>Sign out</span>}
+        </button>
+        {!collapsed && (
+          <p className="text-xs text-muted-foreground text-center pt-1">{user?.name}</p>
+        )}
+      </div>
     </aside>
   );
 }

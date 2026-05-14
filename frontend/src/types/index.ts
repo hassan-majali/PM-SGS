@@ -1,3 +1,19 @@
+export type UserRole = "ADMIN" | "MANAGER" | "VIEWER";
+export type UserStatus = "ACTIVE" | "INACTIVE";
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+}
+
+export interface UserRecord extends AuthUser {
+  status: UserStatus;
+  lastLoginAt: string | null;
+  createdAt: string;
+}
+
 export interface Client {
   id: string;
   name: string;
