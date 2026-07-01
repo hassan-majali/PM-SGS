@@ -20,6 +20,7 @@ export interface Client {
   industry?: string;
   contactName?: string;
   contactEmail?: string;
+  contactPhone?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
