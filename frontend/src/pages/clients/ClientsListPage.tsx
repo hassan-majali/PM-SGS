@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Plus, Building2, Mail, User, ArrowRight, Pencil, Trash2 } from "lucide-react";
+import { Plus, Building2, Mail, User, Phone, ArrowRight, Pencil, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -43,9 +43,13 @@ function ClientForm({ client, onClose }: { client?: Client; onClose: () => void 
           <Label>Contact Name</Label>
           <Input {...register("contactName")} placeholder="John Doe" />
         </div>
-        <div className="col-span-2 space-y-1">
+        <div className="space-y-1">
           <Label>Contact Email</Label>
           <Input {...register("contactEmail")} type="email" placeholder="john@acme.com" />
+        </div>
+        <div className="space-y-1">
+          <Label>Phone Number</Label>
+          <Input {...register("contactPhone")} type="tel" placeholder="+1 555 123 4567" />
         </div>
         <div className="col-span-2 space-y-1">
           <Label>Notes</Label>
@@ -118,6 +122,9 @@ export function ClientsListPage() {
                   )}
                   {client.contactEmail && (
                     <div className="flex items-center gap-2"><Mail className="h-3 w-3" />{client.contactEmail}</div>
+                  )}
+                  {client.contactPhone && (
+                    <div className="flex items-center gap-2"><Phone className="h-3 w-3" />{client.contactPhone}</div>
                   )}
                 </div>
 

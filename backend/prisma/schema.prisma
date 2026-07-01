@@ -25,6 +25,7 @@ model Client {
   industry     String?
   contactName  String?
   contactEmail String?
+  contactPhone String?
   notes        String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
